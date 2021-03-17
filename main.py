@@ -114,10 +114,15 @@ def main(args, ITE=0):
     all_loss = np.zeros(args.end_iter,float)
     all_accuracy = np.zeros(args.end_iter,float)
 
+    print(initial_state_dict.keys())
+    # for name, param in initial_state_dict.named_parameters():
+    #     print(name)
 
+    past = None
     for _ite in range(args.start_iter, ITERATION):
         if not _ite == 0:
             prune_by_percentile(args.prune_percent, resample=resample, reinit=reinit)
+            prune_by_percentile_goback(initial_state_dict, args.prune_percent, resample=resample, reinit=reinit)
             if reinit:
                 model.apply(weight_init)
                 #if args.arch_type == "fc1":
@@ -264,6 +269,31 @@ def test(model, test_loader, criterion):
         test_loss /= len(test_loader.dataset)
         accuracy = 100. * correct / len(test_loader.dataset)
     return accuracy
+
+def prune_by_percentile_goback(initial, percent, resample=False, reinit=False,**kwargs):
+        global step
+        global mask
+        global model
+
+        # Calculate percentile value
+        step = 0
+        for (name, param) in model.named_parameters():
+
+            # We do not prune bias term
+            if 'weight' in name:
+                tensor = param.data.cpu().numpy()
+                alive = tensor[np.nonzero(tensor)] # flattened array of nonzero values
+                percentile_value = np.percentile(abs(alive), percent)
+
+                # Convert Tensors to numpy and calculate
+                weight_dev = param.device
+                new_mask = np.where(abs(tensor) < percentile_value, 0, mask[step])
+                
+                # Apply new weight and mask
+                param.data = torch.from_numpy(tensor * new_mask).to(weight_dev)
+                mask[step] = new_mask
+                step += 1
+        step = 0
 
 # Prune by Percentile module
 def prune_by_percentile(percent, resample=False, reinit=False,**kwargs):
