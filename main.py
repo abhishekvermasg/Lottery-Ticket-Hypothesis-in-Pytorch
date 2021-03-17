@@ -114,14 +114,15 @@ def main(args, ITE=0):
     all_loss = np.zeros(args.end_iter,float)
     all_accuracy = np.zeros(args.end_iter,float)
 
-    print(initial_state_dict.keys())
+    # print(initial_state_dict.keys())
+    # print(initial_state_dict['classifier.0.weight'])
     # for name, param in initial_state_dict.named_parameters():
     #     print(name)
 
     past = None
     for _ite in range(args.start_iter, ITERATION):
         if not _ite == 0:
-            prune_by_percentile(args.prune_percent, resample=resample, reinit=reinit)
+            # prune_by_percentile(args.prune_percent, resample=resample, reinit=reinit)
             prune_by_percentile_goback(initial_state_dict, args.prune_percent, resample=resample, reinit=reinit)
             if reinit:
                 model.apply(weight_init)
@@ -281,7 +282,9 @@ def prune_by_percentile_goback(initial, percent, resample=False, reinit=False,**
 
             # We do not prune bias term
             if 'weight' in name:
+                other = initial[name].data.cpu().numpy()
                 tensor = param.data.cpu().numpy()
+                tensor -= other
                 alive = tensor[np.nonzero(tensor)] # flattened array of nonzero values
                 percentile_value = np.percentile(abs(alive), percent)
 
